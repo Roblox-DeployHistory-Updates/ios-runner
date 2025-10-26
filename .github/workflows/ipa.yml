@@ -1,0 +1,84 @@
+name: IPA Down
+
+env:
+  PYTHONIOENCODING: utf-8
+  APP_BUNDLE_ID: com.roblox.robloxmobile
+  
+# Allow Release
+permissions: write-all
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  download_ipa:
+    name: 'IPATool Operations'
+    runs-on: "windows-latest"
+    steps:
+      - name: Set up git repository
+        uses: actions/checkout@v5
+
+      - name: Setup ipatool-py
+        run: |
+          git clone -b itunes_server https://github.com/Yakov5776/ipatool-py
+          pip3 install -r ipatool-py/requirements.txt
+          mkdir -p ipaDown
+        shell: bash
+
+      - name: Setup iTunes Header Service
+        uses: Yakov5776/actions-iTunes-header@master
+        with:
+          apple_id: ${{ secrets.APPLE_ID }}
+          apple_id_pwd: ${{ secrets.APPLE_ID_PWD }}
+        
+      - name: Execute operation
+        id: operation
+        run: |
+            output=$(python3 ipatool-py/main.py --json lookup -b $APP_BUNDLE_ID -c US \
+                                                download -o ipaDown -s http://127.0.0.1:9000 )
+
+            echo "APP_NAME=$(echo "$output" | jq -r '.appName')" >> $GITHUB_ENV
+            echo "APP_BUNDLE_ID=$(echo "$output" | jq -r '.appBundleId')" >> $GITHUB_ENV
+            echo "APP_VER=$(echo "$output" | jq -r '.appVer')" >> $GITHUB_ENV
+            echo "APP_ID=$(echo "$output" | jq -r '.appId')" >> $GITHUB_ENV
+            echo "APP_VER_ID=$(echo "$output" | jq -r '.appVerId')" >> $GITHUB_ENV
+            echo "DOWNLOAD_URL=$(echo "$output" | jq -r '.downloadUrl')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Check if version already released
+        id: version_check
+        run: |
+          tag_name="${APP_BUNDLE_ID}-${APP_ID}-${APP_VER_ID}"
+          echo "Checking for tag $tag_name"
+          if gh release view "$tag_name" > /dev/null 2>&1; then
+            echo "Release already exists."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+           
+      
+      - name: Pushing to release
+        if: steps.version_check.outputs.exists == 'false'
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          name: "IPADown: ${{ env.APP_NAME }} - ${{ env.APP_VER }}"
+          body: >-
+            ${{ format(fromJSON('"appName: {0}\nappBundleId: {1}\nappVer: {2}\nappId: {3}\nappVerId: {4}\n"'), 
+                  env.APP_NAME, 
+                  env.APP_BUNDLE_ID, 
+                  env.APP_VER, 
+                  env.APP_ID, 
+                  env.APP_VER_ID
+                ) }}
+          commit: ${{ github.sha }}
+          tag: "${{ env.APP_BUNDLE_ID }}-${{ env.APP_ID }}-${{ env.APP_VER_ID }}"
+          artifacts: ipaDown\*
+          allowUpdates: true
+          removeArtifacts: false
+          replacesArtifacts: false
