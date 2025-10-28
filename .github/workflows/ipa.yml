@@ -134,13 +134,14 @@ jobs:
           asyncio.run(main())
           PYCODE
 
-      - name: Extract itunesMetadata.plist
+      - name: Extract plists
         if: steps.version_check.outputs.exists == 'false'
         run: |
           Set-Location "ipaDown"
           $firstIpa = Get-ChildItem -Filter *.ipa | Select-Object -First 1
           Expand-Archive -Path $firstIpa.FullName -DestinationPath "temp"
           Copy-Item "temp\iTunesMetadata.plist" "..\iTunesMetadata.plist" -Force
+          Copy-Item "temp\Info.plist" "..\Info.plist" -Force
 
       
       - name: Pushing to release
@@ -162,3 +163,46 @@ jobs:
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: false
+
+      - name: Extract metadata
+        if: steps.version_check.outputs.exists == 'false'
+        id: extract
+        run: |
+          $today = Get-Date -Format "MM/dd/yyyy"
+          echo "today=$today" >> $env:GITHUB_OUTPUT
+          [xml]$infoPlist = Get-Content "Info.plist"
+          $minOSVersion = $infoPlist.SelectSingleNode("//key[text()='MinimumOSVersion']/following-sibling::string[1]").'#text'
+          echo "MIN_OS_VERSION=$minOSVersion" >> $env:GITHUB_OUTPUT
+          $tag_name = "${{ env.APP_BUNDLE_ID }}-${{ env.APP_ID }}-${{ env.APP_VER_ID }}"
+          $artifact_url = "https://github.com/${{ github.repository }}/releases/download/${tag_name}/${{ env.IPA_FILE_PATH }}"
+          echo "artifact_url=$artifact_url" >> $env:GITHUB_OUTPUT
+
+      - name: Append to Google Sheets
+        id: 'update_worksheet'
+        uses: jroehl/gsheet.action@v2.1.1
+        if: steps.version_check.outputs.exists == 'false'
+        with:
+          spreadsheetId: 1qAN8Eh4iPjO1aECiO1tclTXTLKfCka3StReywLJ3A58
+          commands: |
+            [
+              {
+                "command": "appendData",
+                "args": {
+                  "worksheetTitle": "ROBLOX",
+                  "data": [
+                    [
+                      "${{ env.APP_VER }}",
+                      "${{ steps.extract.outputs.today }}",
+                      "Yes",
+                      "${{ env.APP_VER_ID }}",
+                      "iOS ${{ steps.extract.outputs.MIN_OS_VERSION }}",
+                      "",
+                      "${{ steps.extract.outputs.artifact_url }}"
+                    ]
+                  ]
+                }
+              }
+            ]
+        env:
+          GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
+          GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
