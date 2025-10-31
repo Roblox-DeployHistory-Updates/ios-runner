@@ -1,3 +1,4 @@
+
 name: IPA Down
 
 env:
@@ -141,7 +142,7 @@ jobs:
           $firstIpa = Get-ChildItem -Filter *.ipa | Select-Object -First 1
           Expand-Archive -Path $firstIpa.FullName -DestinationPath "temp"
           Copy-Item "temp\iTunesMetadata.plist" "..\iTunesMetadata.plist" -Force
-          Copy-Item "temp\Info.plist" "..\Info.plist" -Force
+          Copy-Item "temp\Payload\Roblox.app\Info.plist" "..\Info.plist" -Force
 
       
       - name: Pushing to release
