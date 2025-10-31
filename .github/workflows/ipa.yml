@@ -190,6 +190,7 @@ jobs:
                 "command": "appendData",
                 "args": {
                   "worksheetTitle": "ROBLOX",
+                  "minCol": 1,
                   "data": [
                     [
                       "${{ env.APP_VER }}",
