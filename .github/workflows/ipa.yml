@@ -208,3 +208,13 @@ jobs:
         env:
           GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
           GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
+
+
+      - name: Archive clientsettings to Wayback Machine
+        if: steps.version_check.outputs.exists == 'false'
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: LOW ${{ secrets.ARCHIVE_ORG_ACCESS_KEY }}:${{ secrets.ARCHIVE_ORG_SECRET_KEY }}" \
+            --data-urlencode "url=https://clientsettings.roblox.com/v2/settings/application/iOSApp" \
+            https://web.archive.org/save
