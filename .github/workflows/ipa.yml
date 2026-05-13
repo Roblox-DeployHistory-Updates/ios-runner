@@ -212,6 +212,7 @@ jobs:
 
       - name: Archive clientsettings to Wayback Machine
         if: steps.version_check.outputs.exists == 'false'
+        shell: bash
         run: |
           curl -s -X POST \
             -H "Accept: application/json" \
